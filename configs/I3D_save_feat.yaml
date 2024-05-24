@@ -1,0 +1,46 @@
+action: save 
+name: ??? 
+split: ??? 
+resume_from: ??? 
+gpus: null 
+wandb_name: null 
+logname: null 
+models_dir: null 
+modality: ["RGB"] 
+total_batch: 128 
+batch_size: 32 
+
+save:
+  num_clips: ??? #local: 5
+  dense_sampling:
+    RGB: ??? #local: True
+  num_frames_per_clip:
+    RGB: ???
+
+dataset:
+  annotations_path: ???
+  shift: ??? 
+  workers: 4
+  stride: 2
+  resolution: 224
+  RGB:
+    data_path: ??? #local: data/epicKitchenDA/rgb_flow/P08_unzipped
+    tmpl: "frame_{:010d}.jpg" #"img_{:010d}.jpg" # "frame_{:010f}.jpg" for S04 is "frame"
+    features_name: ???
+  Event:
+    rgb4e: 6
+
+models:
+  RGB:
+    model: I3D
+    dropout: ???
+    normalize: ???
+    resolution: 224
+    kwargs: {}
+    lr_steps: 3000
+    lr: 0.01
+    sgd_momentum: 0.9
+    weight_decay: 1e-7
+    weight_i3d_rgb: './pretrained_i3d/rgb_imagenet.pt'
+
+

@@ -1,0 +1,5 @@
+action: train # train or test
+name: train
+
+dataset:
+  shift: SXY-SXY   #SXY-SXY #D1-D1 #S04-S04
