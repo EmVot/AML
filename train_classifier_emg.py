@@ -44,20 +44,22 @@ def main():
     modalities = args.modality
 
     # recover valid paths, domains, classes
-    # this will output the domain conversion (D1 -> 8, et cetera) and the label list
     num_classes, valid_labels, source_domain, target_domain = utils.utils.get_domains_and_labels(args)
     # device where everything is run
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # these dictionaries are for more multi-modal training/testing, each key is a modality used
-    models = {}
-    logger.info("Instantiating models per modality")
-    for m in modalities:
-        logger.info('{} Net\tModality: {}'.format(args.models[m].model, m))
-        # notice that here, the first parameter passed is the input dimension
-        # In our case it represents the feature dimensionality which is equivalent to 1024 for I3D
-        models[m] = getattr(model_list, args.models[m].model)()
-
+    if args.fusion_modalities == True:
+        logger.info("Instantiating FUSION model: %s", args.models['FUSION'].model)
+        
+        fusion_model = getattr(model_list, args.models['FUSION'].model)()
+        models = {'FUSION':fusion_model }
+    else:
+        models = {}
+        for m in args.modality:
+            logger.info("Instantiating models per modality")
+            logger.info('{} Net\tModality: {}'.format(args.models[m].model, m))
+            models[m] = getattr(model_list, args.models[m].model)()
+            
     # the models are wrapped into the ActionRecognition task which manages all the training steps
     action_classifier = tasks.ActionRecognition("action-classifier", models, args.batch_size,
                                                 args.total_batch, args.models_dir, num_classes,
@@ -174,8 +176,12 @@ def train(action_classifier, train_loader, val_loader, device, num_classes):
         #* Action recognition
         source_label = source_label.to(device)
         data = {}
-        for m in modalities:
-            data[m] = source_data[m].to(device)
+        if args.fusion_modalities == True:
+            data['FUSION'] = {m: source_data[m].to(device) for m in modalities}
+        else: 
+            for m in modalities:
+                data[m] = source_data[m].to(device)
+        
         logits, _ = action_classifier.forward(data)
         action_classifier.compute_loss(logits, source_label, loss_weight=1)
         action_classifier.backward(retain_graph=False)
@@ -229,23 +235,13 @@ def validate(model, val_loader, device, it, num_classes):
         for i_val, (data, label) in enumerate(val_loader):
             label = label.to(device)
 
-            for m in modalities:
-                batch = data[m].shape[0]
-                logits[m] = torch.zeros((batch, num_classes)).to(device) #1 #args.test.num_clips
-
-            clip = {}
-            
-            for m in modalities:
-                clip[m] = data[m].to(device)
-
-            output, _ = model(clip)
-            for m in modalities:
-                logits[m] = output[m]
-            
-            #!already performing mean inside mlp 
-            #for m in modalities:
-            #    logits[m] = torch.mean(logits[m], dim=0)
-
+            if args.fusion_modalities == True:
+                data['FUSION'] = {m: data[m].to(device) for m in modalities}
+            else:
+                for m in modalities:
+                    data[m] = data[m].to(device)
+                        
+            logits, _ = model.forward(data)
             model.compute_accuracy(logits, label)
 
             if len(val_loader) >= 5:
